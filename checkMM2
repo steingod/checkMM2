@@ -1,0 +1,242 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*- 
+
+# PURPOSE:
+# To loop through MM2 XML files in a directory and check that they comply
+# with minimum requirements. It will check 2 layers depth if necessary and
+# report datasets that require further checking. Furthermore, the contents
+# of the required fields are also controlled.
+#
+# Required elements are 
+# title, abstract, variable,
+# topiccategory, activity_type,
+# contact, institution, PI_name, 
+# distribution_statement,
+# datacollection_period_from, datacollection_period_to,
+# bounding_box
+#
+# Should work on both directories (2 levels) and individual files. 
+#
+# AUTHOR:
+# Øystein Godøy, METNO/FOU, 2015-05-31 
+#
+# MODIFIED:
+#
+
+import os
+import fnmatch
+import datetime
+import sys
+import re
+import xml.etree.ElementTree as ET
+
+sys.tracebacklimit = 0
+
+# Check title element
+def is_title_ok(title):
+
+    if title is None: return False
+    if len(title) < 5: return False
+
+    return True
+
+# Check abstract element
+def is_abstract_ok(abstract):
+
+    if abstract is None: return False
+    if len(abstract) < 25: return False
+
+    return True
+
+# Check variable element
+# Need GCMD keywords, this is a preliminary check
+def is_variable_ok(variable):
+
+    if variable is None: return False
+    if len(variable) < 5: return False
+
+    return True
+
+# Check topiccategory element
+def is_topiccategory_ok(topiccategory):
+
+    if topiccategory is None: return False
+    if len(topiccategory) < 5: return False
+
+    return True
+
+# Check activity_type element
+def is_activity_type_ok(activity_type):
+
+    if activity_type is None: return False
+    if len(activity_type) < 5: return False
+
+    return True
+
+# Check PI_name element
+def is_PI_name_ok(PI_name):
+
+    if PI_name is None: return False
+    if len(PI_name) < 8: return False
+
+    return True
+
+# Check contact element
+def is_contact_ok(contact):
+
+    if contact is None: return False
+
+    if not re.match('[\w\.]+@[\w+\.]+.\w{2,3}',contact):
+        return False
+
+    return True
+
+# Check institution element
+def is_institution_ok(institution):
+
+    if institution is None: return False
+    if len(institution) < 5: return False
+
+    return True
+
+# Check distribution_statement element
+def is_distribution_statement_ok(distribution_statement):
+
+    if distribution_statement is None: return False
+    if len(distribution_statement) < 4: return False
+
+    return True
+
+# Check datacollection_period_from element
+def is_datacollection_period_from_ok(fromdate):
+
+    try:
+        datetime.datetime.strptime(fromdate,'%Y-%m-%d')
+        return True
+    except ValueError:
+        try:
+            datetime.datetime.strptime(fromdate,'%Y-%m-%d %H:%M UTC')
+            return True
+        except ValueError:
+            pass
+
+    return False
+
+# Check datacollection_period_to element
+def is_datacollection_period_to_ok(todate):
+
+    try:
+        datetime.datetime.strptime(todate,'%Y-%m-%d')
+        return True
+    except ValueError:
+        try:
+            datetime.datetime.strptime(todate,'%Y-%m-%d %H:%M UTC')
+            return True
+        except ValueError:
+            pass
+
+    return False
+
+# Check whether the Bounding Box is correctly defined.
+# East, South, West, North
+# Longitudes are positive eastwords
+def is_bounding_box_ok(bb = []):
+
+    # Check longitudes
+    if not (bb[0] > -180 and bb[0] < 180): return False
+    if not (bb[2] > -180 and bb[2] < 180): return False
+    # Check latitudes
+    if not (bb[1] > -90 and bb[1] < 90): return False
+    if not (bb[3] > -90 and bb[3] < 90): return False
+
+    if bb[1] > bb[3]: return False # Check order of latitudes
+    if bb[0] < bb[2]: return False # Check order of longitudes
+
+    return True
+
+# Main code block below, rewrite to main later...
+
+indir = "/disk1/data/dokipy/orig-metadata/"
+
+required_elements = {
+        'title': 1, 'abstract': 1, 'variable': 50, 
+        'topiccategory': 1, 'activity_type': 1, 
+        'contact': 1, 'institution': 1, 'PI_name': 1, 
+        'distribution_statement':1, 
+        'datacollection_period_from':1, 'datacollection_period_to':1}
+
+fncnt = 0
+for filename in os.listdir(indir):
+    if fnmatch.fnmatch(filename,'*.xml'):
+        fncnt += 1
+        is_ok = True
+        mycounter = dict.fromkeys(required_elements.keys(), 0)
+        #print "\nParsing",filename
+        tree = ET.ElementTree(file=os.path.join(indir,filename))
+        root = tree.getroot()
+        for elem in tree.iter():
+            if elem.get('name') is None: continue
+            if any(elem.get('name') in els for els in required_elements):
+                #print "\t",elem.get('name')
+                if elem.get('name') == 'title':
+                    is_ok = is_title_ok(elem.text)
+                    if is_ok: 
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'abstract':
+                    is_ok = is_abstract_ok(elem.text)
+                    if is_ok: 
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'PI_name':
+                    is_ok = is_PI_name_ok(elem.text)
+                    if is_ok: 
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'contact':
+                    is_ok = is_contact_ok(elem.text)
+                    if is_ok: 
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'institution':
+                    is_ok = is_institution_ok(elem.text)
+                    if is_ok: 
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'topiccategory':
+                    is_ok = is_topiccategory_ok(elem.text)
+                    if is_ok: 
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'activity_type':
+                    is_ok = is_activity_type_ok(elem.text)
+                    if is_ok: 
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'variable':
+                    is_ok = is_variable_ok(elem.text)
+                    if is_ok:
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'distribution_statement':
+                    is_ok = is_distribution_statement_ok(elem.text)
+                    if is_ok:
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'datacollection_period_from':
+                    is_ok = is_datacollection_period_from_ok(elem.text)
+                    if is_ok: 
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'datacollection_period_to':
+                    is_ok = is_datacollection_period_to_ok(elem.text)
+                    if is_ok:
+                        mycounter[elem.get('name')] += 1
+                if elem.get('name') == 'bounding_box':
+                    is_ok = is_bounding_box_ok(map(float,elem.text.split(',')))
+                    if is_ok:
+                        mycounter[elem.get('name')] += 1
+        #print "\t",mycounter
+        for els in required_elements:
+            if required_elements[els] == 1:
+                if not mycounter[els] == 1: 
+                    print els,"occurs", mycounter[els],"expected",required_elements[els]
+                    is_ok = False
+            elif required_elements[els] > 1:
+                if mycounter[els] < 1:
+                    print els,"is missing",mycounter[els]
+                    is_ok = False
+        if not is_ok: 
+            print "\t",filename, "is not a valid MM2 document\n"
+
+print "A total of",fncnt,"files were checked"
